@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<!-- JP Motorista — app do motorista da JP Transportes (PWA).
+     Os dados vêm da planilha do Sistema JP por uma API no Google Apps Script (constante API abaixo).
+     Aqui não há senha, PIN nem dado de motorista: o acesso é por PIN, checado no servidor. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B2D5B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JP Motorista">
+<title>JP Motorista</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0B2D5B;--navy-2:#0E3870;--navy-3:#082247;--blue:#007BFF;--blue-soft:#E6F1FF;--graphite:#4B5563;--muted:#8A94A6;--line:#E3E8F0;--bg:#F5F7FA;--ok:#16A34A;--ok-soft:#E8F7EE;--warn:#B45309;--warn-soft:#FEF4E2;--bad:#DC2626;--bad-soft:#FDECEC;--top:env(safe-area-inset-top);--bot:env(safe-area-inset-bottom)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg)}
+body{font-family:Montserrat,system-ui,sans-serif;color:var(--navy);font-size:15px;-webkit-font-smoothing:antialiased;min-height:100vh}
+button,input,select,textarea{font-family:inherit}
+.hide{display:none!important}
+
+/* topo */
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--navy),var(--navy-3));color:#fff;padding:calc(10px + var(--top)) 16px 12px;display:flex;align-items:center;gap:12px}
+header img{height:34px}
+header .who{flex:1;min-width:0}
+header .who b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header .who small{font-size:11.5px;opacity:.75;font-weight:500}
+header button{background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:600}
+
+main{max-width:560px;margin:0 auto;padding:14px 14px calc(96px + var(--bot))}
+.card{background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 2px rgba(11,45,91,.06),0 4px 16px rgba(11,45,91,.05)}
+.card h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;font-weight:700;display:flex;align-items:center;gap:8px}
+.card h2 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:600;color:var(--graphite)}
+.hello{font-size:21px;font-weight:800;margin:4px 2px 12px}
+.hello small{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-top:3px}
+.muted{color:var(--muted);font-size:13px}
+.empty{color:var(--muted);font-size:13.5px;text-align:center;padding:10px 0}
+
+/* números */
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.tile{background:#fff;border-radius:14px;padding:13px 14px;box-shadow:0 1px 2px rgba(11,45,91,.06),0 4px 16px rgba(11,45,91,.05)}
+.tile span{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.tile b{display:block;font-size:22px;font-weight:800;margin-top:4px}
+.tile small{font-size:11.5px;color:var(--graphite);font-weight:500}
+.tile.wide{grid-column:1/-1;background:linear-gradient(135deg,var(--navy),var(--navy-2));color:#fff}
+.tile.wide span,.tile.wide small{color:rgba(255,255,255,.75)}
+
+/* rota */
+.rota{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.rota:last-child{margin-bottom:0}
+.rota .l1{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.rota .l1 .v{margin-left:auto;font-weight:800}
+.rota .l2{font-size:12.5px;color:var(--graphite);margin-top:4px;font-weight:500}
+.bar{height:8px;background:var(--bg);border-radius:6px;overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--blue);border-radius:6px}
+.nums{display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--graphite);font-weight:500}
+.nums b{color:var(--navy);font-size:14px}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--bg);color:var(--graphite);white-space:nowrap}
+.tag.blue{background:var(--blue-soft);color:var(--blue)}.tag.ok{background:var(--ok-soft);color:var(--ok)}.tag.warn{background:var(--warn-soft);color:var(--warn)}.tag.bad{background:var(--bad-soft);color:var(--bad)}.tag.navy{background:#E7ECF4;color:var(--navy)}
+.lista{list-style:none;margin:0;padding:0}
+.lista li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px}
+.lista li:first-child{border-top:0;padding-top:0}
+.lista li .x{flex:1;min-width:0}
+.lista li .x b{display:block;font-size:14px}
+.lista li .x small{color:var(--graphite);font-size:12px;font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aviso{background:var(--blue-soft);border-radius:12px;padding:11px 13px;font-size:13.5px;margin-bottom:8px;line-height:1.45}
+.aviso small{display:block;color:var(--muted);font-size:11px;font-weight:600;margin-bottom:2px}
+.link{color:var(--blue);font-weight:700;font-size:13px;background:none;border:0;padding:0;cursor:pointer}
+
+/* segmentado */
+.seg{display:flex;background:#fff;border-radius:12px;padding:4px;gap:4px;margin-bottom:12px;box-shadow:0 1px 2px rgba(11,45,91,.06)}
+.seg button{flex:1;border:0;background:none;border-radius:9px;padding:9px 4px;font-size:13px;font-weight:700;color:var(--graphite)}
+.seg button.on{background:var(--blue);color:#fff}
+
+/* formulário */
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px}
+label.first{margin-top:0}
+.hint{font-size:12px;color:var(--graphite);margin-top:5px;font-weight:500}
+input,select,textarea{width:100%;font-size:16px;color:var(--navy);border:1.5px solid var(--line);border-radius:10px;padding:12px;background:#fff;outline:none;-webkit-appearance:none;appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%230B2D5B' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.big{font-size:22px;font-weight:700;letter-spacing:.02em}
+.calc{margin-top:10px;font-size:13px;color:var(--graphite);background:var(--bg);border-radius:8px;padding:9px 11px;display:flex;justify-content:space-between}
+.calc b{color:var(--navy)}
+.toggle{display:flex;gap:8px}.toggle button{flex:1;font-weight:700;font-size:15px;padding:13px;border-radius:10px;border:1.5px solid var(--line);background:#fff;color:var(--graphite)}
+.toggle button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.foto{border:1.5px dashed #B9C6D8;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;background:var(--bg);position:relative}
+.foto+.foto{margin-top:10px}
+.foto input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.foto .th{width:64px;height:64px;border-radius:8px;background:#fff center/cover no-repeat;border:1px solid var(--line);flex:none;display:grid;place-items:center}
+.foto .th svg{width:26px;height:26px;stroke:var(--muted);fill:none;stroke-width:1.8}
+.foto.ok{border-style:solid;border-color:var(--ok);background:var(--ok-soft)}.foto.ok .th svg{display:none}
+.foto b{display:block;font-size:14px}.foto span{font-size:12px;color:var(--graphite)}
+details summary{font-size:13px;font-weight:600;color:var(--blue);cursor:pointer;margin-top:10px}
+.msg{border-radius:10px;padding:12px 14px;font-size:13.5px;font-weight:600;margin-bottom:12px}
+.msg.bad{background:var(--bad-soft);color:var(--bad)}.msg.warn{background:var(--warn-soft);color:var(--warn)}.msg.ok{background:var(--ok-soft);color:var(--ok)}
+.btn{width:100%;font-weight:800;font-size:16px;letter-spacing:.02em;background:var(--blue);color:#fff;border:0;border-radius:12px;padding:16px;cursor:pointer}
+.btn:disabled{opacity:.6}
+.btn.sec{background:#fff;color:var(--navy);border:1.5px solid var(--line)}
+.rules{font-size:12.5px;color:var(--graphite);line-height:1.55;margin:14px 4px 0}
+
+/* login */
+#login{min-height:100vh;background:linear-gradient(180deg,var(--navy),var(--navy-3));display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(24px + var(--top)) 22px calc(24px + var(--bot))}
+#login img{width:190px;margin-bottom:26px}
+#login .box{width:100%;max-width:380px;background:#fff;border-radius:18px;padding:20px}
+#login h1{font-size:18px;margin:0 0 4px}
+#login p{margin:0 0 14px;color:var(--graphite);font-size:13px}
+.pin{display:flex;gap:10px;justify-content:center;margin:6px 0 14px}
+.pin i{width:46px;height:54px;border-radius:12px;border:1.5px solid var(--line);display:grid;place-items:center;font-style:normal;font-size:24px;font-weight:800}
+.pin i.f{border-color:var(--blue);background:var(--blue-soft)}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kp button{border:0;background:var(--bg);border-radius:12px;padding:14px 0;font-size:20px;font-weight:700;color:var(--navy)}
+.kp button:active{background:var(--blue-soft)}
+
+/* navegação */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#fff;border-top:1px solid var(--line);display:flex;padding:6px 6px calc(6px + var(--bot))}
+nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:11px;font-weight:700;color:var(--muted);position:relative}
+nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--blue)}
+nav button .dot{position:absolute;top:2px;left:calc(50% + 8px);min-width:17px;height:17px;border-radius:9px;background:var(--bad);color:#fff;font-size:10px;display:grid;place-items:center;padding:0 4px}
+
+.load{display:flex;flex-direction:column;align-items:center;gap:12px;padding:50px 0;color:var(--muted);font-weight:600;font-size:13.5px}
+.gira{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:g 1s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+.done{text-align:center;padding:26px 14px}.done .ck{width:72px;height:72px;border-radius:50%;background:var(--ok-soft);display:grid;place-items:center;margin:0 auto 14px}
+.done .ck svg{width:38px;height:38px;stroke:var(--ok);fill:none;stroke-width:2.6}
+.done h3{margin:0 0 6px;font-size:20px}.done p{margin:4px 0;color:var(--graphite);font-size:14px}
+#instalar{position:fixed;left:10px;right:10px;bottom:calc(76px + var(--bot));z-index:7;background:var(--navy);color:#fff;border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(11,45,91,.35);font-size:13.5px;line-height:1.4}
+#instalar img{width:40px;height:40px;border-radius:10px}
+#instalar p{margin:0;flex:1}
+#instalar button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;background:var(--blue);color:#fff}
+#instalar .x{background:none;color:rgba(255,255,255,.7);font-size:20px;padding:4px 8px;font-weight:400}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login" class="hide">
+  <img src="logo.webp" alt="JP Transportes">
+  <div class="box">
+    <h1>Entrar</h1>
+    <p>Escolha seu nome e digite seu PIN.</p>
+    <div id="lmsg"></div>
+    <select id="lnome"><option value="">Carregando nomes…</option></select>
+    <div class="pin" id="pinbox"><i></i><i></i><i></i><i></i></div>
+    <div class="kp" id="kp"></div>
+  </div>
+</section>
+
+<!-- APP -->
+<section id="app" class="hide">
+  <header>
+    <img src="logo.webp" alt="JP">
+    <div class="who"><b id="hnome"></b><small id="hsub"></small></div>
+    <button id="bsair">Sair</button>
+  </header>
+  <main id="view"></main>
+  <nav id="nav"></nav>
+</section>
+
+<div id="instalar" class="hide"><img src="icone-192.png" alt=""><p id="itxt">Instale o app <b>JP Motorista</b> para abrir direto pelo ícone.</p><button id="ibtn">Instalar</button><button class="x" id="ix" aria-label="Fechar">×</button></div>
+
+<script>
+(function(){
+'use strict';
+/* Endereço da API (Apps Script "Abastecimento JP - Registro", implantação App da Web). Se mudar, trocar aqui. */
+var API='https://script.google.com/macros/s/AKfycbzxX76lmrk8PfDgTHxTjBX5JXoyD5CoK2-xTEPy8TttHUhADn1TaztNAQOeKru8Z3Tr/exec';
+
+var $=function(id){return document.getElementById(id)};
+var ls=function(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){return ''}};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+var brl=function(v){return(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})};
+var nf=function(v,d){return(v||0).toLocaleString('pt-BR',{maximumFractionDigits:d==null?0:d})};
+var num=function(s){s=String(s||'').trim();if(!s)return 0;if(s.indexOf(',')>=0)s=s.replace(/\./g,'').replace(',','.');return parseFloat(s)||0};
+var DOW=['dom','seg','ter','qua','qui','sex','sáb'];
+var S={token:ls('jp_token'),user:JSON.parse(ls('jp_user')||'null'),tela:'inicio',dados:{},periodo:'quinzena',cheio:true,foto:{}};
+
+/* ---------- API ---------- */
+function api(acao,extra){
+  var body=Object.assign({acao:acao,token:S.token},extra||{});
+  return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'})
+    .then(function(r){if(!r.ok)throw new Error('Servidor respondeu '+r.status);return r.json()})
+    .then(function(j){if(j&&j.sair){sair(true);throw new Error(j.erro)}if(!j||!j.ok)throw new Error((j&&j.erro)||'Erro no servidor.');return j})
+    .catch(function(e){if(e instanceof TypeError)throw new Error(navigator.onLine?'Não consegui falar com o servidor. Tente de novo.':'Sem internet no momento.');throw e});
+}
+
+/* ---------- ícones ---------- */
+var IC={
+  inicio:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+  abastecer:'<path d="M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16"/><path d="M3 21h13M7 8h5"/><path d="M15 10h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V9l-3-3"/>',
+  rotas:'<path d="M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M8 17h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/>',
+  pnr:'<path d="M12 3l9 16H3L12 3z"/><path d="M12 10v4M12 17h.01"/>'
+};
+var cam='<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+var TELAS=[['inicio','Início'],['abastecer','Abastecer'],['rotas','Rotas'],['pnr','PNR']];
+
+/* ---------- login ---------- */
+var pin='';
+function telaLogin(){
+  $('app').classList.add('hide');$('login').classList.remove('hide');
+  var k='';[1,2,3,4,5,6,7,8,9,'',0,'⌫'].forEach(function(n){k+=n===''?'<span></span>':'<button type="button" data-n="'+n+'">'+n+'</button>'});
+  $('kp').innerHTML=k;pin='';pinDraw();
+  fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'motoristas'})}).then(function(r){return r.json()}).then(function(j){
+    $('lnome').innerHTML='<option value="">Seu nome</option>'+(j.motoristas||[]).map(function(m){return'<option>'+esc(m)+'</option>'}).join('');
+    var u=ls('jp_ultimo_nome');if(u)$('lnome').value=u;
+  }).catch(function(){$('lmsg').innerHTML='<div class="msg bad">Sem conexão com o servidor. Confira a internet e abra de novo.</div>'});
+}
+function pinDraw(){[].forEach.call($('pinbox').children,function(el,i){el.textContent=pin[i]?'•':'';el.className=pin[i]?'f':''})}
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('#kp button');if(!b)return;
+  var n=b.dataset.n;if(n==='⌫')pin=pin.slice(0,-1);else if(pin.length<4)pin+=n;
+  pinDraw();if(pin.length===4)entrar();
+});
+function entrar(){
+  var nome=$('lnome').value;
+  if(!nome){$('lmsg').innerHTML='<div class="msg bad">Escolha seu nome primeiro.</div>';pin='';pinDraw();return}
+  $('lmsg').innerHTML='<div class="msg warn">Entrando…</div>';
+  api('login',{nome:nome,pin:pin}).then(function(j){
+    S.token=j.token;S.user=j.usuario;ls('jp_token',j.token);ls('jp_user',JSON.stringify(j.usuario));ls('jp_ultimo_nome',nome);
+    $('lmsg').innerHTML='';iniciar();
+  }).catch(function(e){$('lmsg').innerHTML='<div class="msg bad">'+esc(e.message)+'</div>';pin='';pinDraw()});
+}
+function sair(silencioso){
+  if(!silencioso&&S.token)api('sair').catch(function(){});
+  S.token='';S.user=null;S.dados={};ls('jp_token',null);ls('jp_user',null);telaLogin();
+}
+$('bsair').onclick=function(){if(confirmaSair())sair()};
+function confirmaSair(){return true}
+
+/* ---------- casca ---------- */
+function iniciar(){
+  $('login').classList.add('hide');$('app').classList.remove('hide');
+  $('hnome').textContent='Olá, '+(S.user?S.user.curto:'');
+  $('hsub').textContent=S.user&&S.user.rep?'Representante · vê todos':'Motorista';
+  ir(location.hash.replace('#','')||'inicio');
+}
+function navDraw(){
+  var d=S.dados.inicio||{};
+  $('nav').innerHTML=TELAS.map(function(t){
+    var dot=t[0]==='pnr'&&d.pnrAbertos?'<span class="dot">'+d.pnrAbertos+'</span>':'';
+    return'<button data-t="'+t[0]+'" class="'+(S.tela===t[0]?'on':'')+'"><svg viewBox="0 0 24 24">'+IC[t[0]]+'</svg>'+t[1]+dot+'</button>';
+  }).join('');
+}
+$('nav').addEventListener('click',function(e){var b=e.target.closest('button');if(b)ir(b.dataset.t)});
+window.addEventListener('hashchange',function(){var t=location.hash.replace('#','');if(t&&t!==S.tela&&S.token)ir(t)});
+function ir(t){
+  if(!TELAS.some(function(x){return x[0]===t}))t='inicio';
+  S.tela=t;if(location.hash!=='#'+t)history.replaceState(null,'','#'+t);
+  navDraw();window.scrollTo(0,0);R[t]();
+}
+function carregando(txt){$('view').innerHTML='<div class="load"><div class="gira"></div>'+(txt||'Carregando…')+'</div>'}
+function falha(e,retry){$('view').innerHTML='<div class="msg bad">'+esc(e.message||e)+'</div><button class="btn sec" id="retry">Tentar de novo</button>';$('retry').onclick=retry}
+
+var R={};
+
+/* ---------- INÍCIO ---------- */
+R.inicio=function(){
+  if(!S.dados.inicio)carregando();else desenhaInicio();
+  api('inicio').then(function(j){S.dados.inicio=j;S.user=j.usuario;ls('jp_user',JSON.stringify(j.usuario));navDraw();if(S.tela==='inicio')desenhaInicio()})
+    .catch(function(e){if(!S.dados.inicio)falha(e,R.inicio)});
+};
+function rotaCard(r,mostraNome){
+  var base=r.saldo||r.pacotes||0,feito=r.entregues+r.insucessos,p=base?Math.round(feito/base*100):0;
+  var st=r.andamento?'<span class="tag blue">Em rota</span>':'<span class="tag ok">Fechada</span>';
+  return'<div class="rota"><div class="l1">'+(mostraNome?esc(r.motorista.split(' ')[0])+' · ':'')+esc(r.cat)+' '+st+(r.valor!=null&&!r.andamento?'<span class="v">'+brl(r.valor)+'</span>':'')+'</div>'+
+    '<div class="l2">'+esc(r.destino||'Destino a definir')+' · '+esc(r.placa||'')+(r.saida?' · saiu '+esc(r.saida.slice(-5)):'')+'</div>'+
+    '<div class="bar"><i style="width:'+Math.min(100,p)+'%"></i></div>'+
+    '<div class="nums"><span><b>'+nf(r.entregues)+'</b> entregues</span><span><b>'+nf(r.insucessos)+'</b> insucessos</span><span><b>'+nf(r.pendentes)+'</b> pendentes</span><span style="margin-left:auto"><b>'+p+'%</b></span></div></div>';
+}
+function desenhaInicio(){
+  var d=S.dados.inicio,h='';
+  h+='<div class="hello">Olá, '+esc(d.usuario.curto)+'<small>'+esc(d.hoje)+(d.atualizado?' · dados de '+esc(d.atualizado.slice(-5)):'')+'</small></div>';
+  if(d.avisos&&d.avisos.length)h+='<div class="card"><h2>Avisos</h2>'+d.avisos.map(function(a){return'<div class="aviso">'+(a.data?'<small>'+esc(a.data)+'</small>':'')+esc(a.texto)+'</div>'}).join('')+'</div>';
+  if(d.quinzena)h+='<div class="tiles"><div class="tile wide"><span>Quinzena '+esc(d.quinzena.periodo)+'</span><b>'+brl(d.quinzena.valor)+'</b><small>'+d.quinzena.rotas+' rotas'+(d.quinzena.estimadas?' · '+d.quinzena.estimadas+' ainda estimadas (sem pré-fatura)':'')+'</small></div></div>';
+  h+='<div class="card"><h2>Hoje na rua<span class="r">'+d.hojeRotas.length+'</span></h2>'+(d.hojeRotas.length?d.hojeRotas.map(function(r){return rotaCard(r,d.usuario.rep)}).join(''):'<div class="empty">Nenhuma rota sua hoje ainda.</div>')+'</div>';
+  h+='<div class="card"><h2>Previsão para amanhã<span class="r">'+esc(d.amanha.slice(0,5))+'</span></h2>'+(d.previsao.length?'<ul class="lista">'+d.previsao.map(function(p){return'<li><div class="x"><b>'+esc(p.cluster||'Rota')+'</b><small>'+esc(p.cidades)+'</small></div><span class="tag navy">'+nf(p.pacotes)+' pac · '+nf(p.paradas)+' par</span></li>'}).join('')+'</ul>':'<div class="empty">A previsão de amanhã sai à noite, depois que o caminhão chega.</div>')+'</div>';
+  h+='<div class="tiles"><div class="tile" onclick="location.hash=\'pnr\'"><span>PNR em aberto</span><b>'+d.pnrAbertos+'</b><small>'+(d.pnrVencidos?'<span style="color:var(--bad)">'+d.pnrVencidos+' vencido(s)</span>':'nenhum vencido')+'</small></div>'+
+    '<div class="tile" onclick="location.hash=\'abastecer\'"><span>Abastecer</span><b style="font-size:16px;margin-top:8px">Registrar vale →</b><small>com foto do vale e do painel</small></div></div>';
+  if(d.ultimaRota&&!d.hojeRotas.some(function(r){return r.idMotorista===d.ultimaRota.idMotorista}))h+='<div class="card"><h2>Sua última rota<span class="r">'+esc(d.ultimaRota.data.slice(0,5))+'</span></h2>'+rotaCard(d.ultimaRota,false)+'</div>';
+  $('view').innerHTML=h;
+}
+
+/* ---------- ABASTECER ---------- */
+R.abastecer=function(){
+  var d=S.dados.inicio;
+  if(!d){carregando();api('inicio').then(function(j){S.dados.inicio=j;navDraw();if(S.tela==='abastecer')R.abastecer()}).catch(function(e){falha(e,R.abastecer)});return}
+  var c=d.cadastro;S.foto={};S.cheio=true;
+  $('view').innerHTML='<div id="amsg"></div>'+
+  '<div class="card"><h2>Veículo e vale</h2>'+
+    '<label class="first" for="placa">Placa</label><select id="placa"><option value="">Escolha a placa</option>'+c.placas.map(function(p){return'<option value="'+p.placa+'">'+p.placa+(p.modelo?' · '+esc(p.modelo):'')+'</option>'}).join('')+'</select>'+
+    '<div class="hint" id="ultkm"></div>'+
+    '<label for="vale">Nº do vale</label><input id="vale" inputmode="numeric" placeholder="Número vermelho no canto do vale">'+
+    '<label for="quando">Data e hora</label><input id="quando" type="datetime-local" value="'+c.agora+'"></div>'+
+  '<div class="card"><h2>Km e combustível</h2>'+
+    '<label class="first" for="km">Km do painel (hodômetro)</label><input id="km" class="big" inputmode="numeric" placeholder="Ex.: 84512">'+
+    '<div class="row"><div><label for="litros">Litros</label><input id="litros" inputmode="decimal" placeholder="29,83"></div><div><label for="valor">Valor (R$)</label><input id="valor" inputmode="decimal" placeholder="199,86"></div></div>'+
+    '<div class="calc" id="calc"><span>Preço por litro</span><b>—</b></div>'+
+    '<label>Encheu o tanque?</label><div class="toggle" id="cheio"><button type="button" data-v="1" class="on">Sim, completei</button><button type="button" data-v="0">Não</button></div>'+
+    '<div class="hint">Sempre que der, complete o tanque — é assim que o consumo do carro é medido.</div>'+
+    '<details><summary>O vale tem outro item (óleo, aditivo, fluido)?</summary><div class="row" style="margin-top:8px"><div><label for="outros">Item</label><input id="outros" placeholder="Ex.: fluido de freio"></div><div><label for="valorOutros">Valor (R$)</label><input id="valorOutros" inputmode="decimal" placeholder="0,00"></div></div></details></div>'+
+  '<div class="card"><h2>Fotos</h2>'+
+    '<div class="foto" id="f_vale"><div class="th">'+cam+'</div><div><b>Foto do vale</b><span>Vale inteiro, com número, litros e valor legíveis</span></div><input type="file" accept="image/*" capture="environment" data-k="vale"></div>'+
+    '<div class="foto" id="f_painel"><div class="th">'+cam+'</div><div><b>Foto do painel</b><span>Hodômetro com o km aparecendo</span></div><input type="file" accept="image/*" capture="environment" data-k="painel"></div>'+
+    '<label for="obs">Observação (opcional)</label><textarea id="obs" rows="2" placeholder="Algo fora do normal?"></textarea></div>'+
+  '<button class="btn" id="enviar">Registrar abastecimento</button>'+
+  '<p class="rules"><b>Regras do convênio:</b> um vale por veículo · placa e km escritos no vale · nada de galão · registrar na hora, antes de sair do posto.</p>'+
+  '<div class="card" style="margin-top:16px"><h2>Últimos registros</h2><div id="hist"><div class="empty">Carregando…</div></div></div>';
+  var u=ls('jp_placa');if(u&&c.placas.some(function(x){return x.placa===u})){$('placa').value=u;ultKm()}
+  $('placa').onchange=ultKm;
+  ['litros','valor'].forEach(function(i){$(i).oninput=calc});
+  $('cheio').onclick=function(e){var b=e.target.closest('button');if(!b)return;S.cheio=b.dataset.v==='1';[].forEach.call($('cheio').children,function(x){x.classList.toggle('on',x===b)})};
+  [].forEach.call(document.querySelectorAll('.foto input'),function(i){i.onchange=foto});
+  $('enviar').onclick=enviar;
+  api('abastecimentos').then(function(j){
+    if(!$('hist'))return;
+    $('hist').innerHTML=j.itens.length?'<ul class="lista">'+j.itens.slice(0,8).map(function(a){return'<li><div class="x"><b>'+esc(a.placa)+' · '+nf(a.litros,2)+' L'+(a.valor!=null?' · '+brl(a.valor):'')+'</b><small>'+esc(a.data)+' · vale '+esc(a.vale)+(S.user.rep?' · '+esc(a.motorista):'')+(a.km?' · '+nf(a.km)+' km':'')+'</small></div>'+(a.cheio?'<span class="tag ok">cheio</span>':'')+'</li>'}).join('')+'</ul>':'<div class="empty">Nenhum abastecimento registrado ainda.</div>';
+  }).catch(function(){if($('hist'))$('hist').innerHTML='<div class="empty">Não carregou o histórico.</div>'});
+};
+function ultKm(){var p=S.dados.inicio.cadastro.placas.find(function(x){return x.placa===$('placa').value});$('ultkm').textContent=p&&p.ultimoKm?'Último km registrado: '+nf(p.ultimoKm):''}
+function calc(){var l=num($('litros').value),v=num($('valor').value);$('calc').innerHTML='<span>Preço por litro</span><b>'+(l&&v?brl(v/l):'—')+'</b>'}
+function foto(e){
+  var k=e.target.dataset.k,f=e.target.files[0];if(!f)return;
+  var box=$('f_'+k);box.querySelector('span').textContent='Processando…';
+  var img=new Image(),url=URL.createObjectURL(f);
+  img.onload=function(){
+    var max=1600,r=Math.min(1,max/Math.max(img.width,img.height));
+    var cv=document.createElement('canvas');cv.width=Math.round(img.width*r);cv.height=Math.round(img.height*r);
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+    S.foto[k]=cv.toDataURL('image/jpeg',.72);URL.revokeObjectURL(url);
+    box.classList.add('ok');box.querySelector('.th').style.backgroundImage='url('+S.foto[k]+')';
+    box.querySelector('span').textContent='Foto pronta · toque para trocar';
+  };
+  img.onerror=function(){box.querySelector('span').textContent='Não consegui abrir a foto, tente de novo'};
+  img.src=url;
+}
+function amsg(t,cls){$('amsg').innerHTML='<div class="msg '+(cls||'bad')+'">'+esc(t)+'</div>';window.scrollTo({top:0,behavior:'smooth'})}
+function enviar(){
+  var d={placa:$('placa').value,vale:$('vale').value.trim(),quando:$('quando').value,km:num($('km').value.replace(/\D/g,'')),
+    litros:num($('litros').value),valor:num($('valor').value),cheio:S.cheio,outros:$('outros').value.trim(),valorOutros:num($('valorOutros').value),
+    obs:$('obs').value.trim(),fotoVale:S.foto.vale,fotoPainel:S.foto.painel};
+  var falta=[];
+  if(!d.placa)falta.push('placa');if(!d.vale)falta.push('nº do vale');if(!d.km)falta.push('km do painel');
+  if(!d.litros)falta.push('litros');if(!d.valor)falta.push('valor');if(!d.fotoVale)falta.push('foto do vale');if(!d.fotoPainel)falta.push('foto do painel');
+  if(falta.length)return amsg('Falta preencher: '+falta.join(', ')+'.');
+  var p=S.dados.inicio.cadastro.placas.find(function(x){return x.placa===d.placa});
+  if(p&&p.ultimoKm&&d.km<=p.ultimoKm)return amsg('O km está menor que o último registrado para '+d.placa+' ('+nf(p.ultimoKm)+'). Confira o painel.');
+  var b=$('enviar');b.disabled=true;b.textContent='Enviando…';
+  api('abastecer',{dados:d}).then(function(r){
+    ls('jp_placa',d.placa);if(p)p.ultimoKm=d.km;
+    $('view').innerHTML='<div class="card done"><div class="ck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></div><h3>Abastecimento registrado</h3><p><b>'+esc(d.placa)+'</b> · vale '+esc(d.vale)+'</p><p>'+nf(d.litros,2)+' L · '+brl(d.valor+d.valorOutros)+' · '+nf(d.km)+' km</p>'+
+      (r.avisos&&r.avisos.length?'<div class="msg warn" style="margin-top:14px;text-align:left">'+r.avisos.map(esc).join('<br>')+'</div>':'')+
+      '<button class="btn" style="margin-top:18px" id="outro">Registrar outro</button><button class="btn sec" style="margin-top:10px" onclick="location.hash=\'inicio\'">Voltar ao início</button></div>';
+    $('outro').onclick=R.abastecer;
+  }).catch(function(e){b.disabled=false;b.textContent='Registrar abastecimento';amsg(e.message)});
+}
+
+/* ---------- ROTAS ---------- */
+R.rotas=function(){
+  var per=S.periodo,k='rotas_'+per;
+  var seg='<div class="seg" id="seg">'+[['quinzena','Quinzena atual'],['anterior','Anterior'],['mes','Mês']].map(function(p){return'<button data-p="'+p[0]+'" class="'+(per===p[0]?'on':'')+'">'+p[1]+'</button>'}).join('')+'</div>';
+  if(S.dados[k])desenhaRotas(seg,S.dados[k]);else $('view').innerHTML=seg+'<div class="load"><div class="gira"></div>Carregando rotas…</div>';
+  $('seg').onclick=function(e){var b=e.target.closest('button');if(b){S.periodo=b.dataset.p;R.rotas()}};
+  api('rotas',{periodo:per}).then(function(j){S.dados[k]=j;if(S.tela==='rotas'&&S.periodo===per){desenhaRotas(seg,j);$('seg').onclick=function(e){var b=e.target.closest('button');if(b){S.periodo=b.dataset.p;R.rotas()}}}})
+    .catch(function(e){if(!S.dados[k])$('view').innerHTML=seg+'<div class="msg bad">'+esc(e.message)+'</div>'});
+};
+function desenhaRotas(seg,j){
+  var t=j.totais,pct=t.entregues+t.insucessos?(t.entregues/(t.entregues+t.insucessos)*100):0,h=seg;
+  h+='<div class="tiles">'+(j.rep?'<div class="tile wide"><span>Valor '+esc(j.periodo)+'</span><b>'+brl(t.valor)+'</b><small>'+(t.estimadas?t.estimadas+' rota(s) estimada(s) pela tabela até sair a pré-fatura':'conferido com o pago')+'</small></div>':'')+
+    '<div class="tile"><span>Rotas</span><b>'+t.rotas+'</b><small>'+esc(j.periodo)+'</small></div>'+
+    '<div class="tile"><span>Entrega</span><b>'+pct.toFixed(1).replace('.',',')+'%</b><small>'+nf(t.entregues)+' entregues · '+nf(t.insucessos)+' insuc.</small></div></div>';
+  if(j.rep&&t.porMotorista&&t.porMotorista.length)h+='<div class="card"><h2>Por motorista</h2><ul class="lista">'+t.porMotorista.map(function(m){return'<li><div class="x"><b>'+esc(m.curto)+'</b><small>'+m.rotas+' rotas · '+nf(m.entregues)+' entregues · '+nf(m.insucessos)+' insucessos</small></div><b>'+brl(m.valor)+'</b></li>'}).join('')+'</ul></div>';
+  h+='<div class="card"><h2>Rotas<span class="r">'+j.rotas.length+'</span></h2>'+(j.rotas.length?j.rotas.map(function(r){
+    var d=r.data.slice(0,5)+' '+(r.dow!=null?DOW[r.dow]:'');
+    return'<div class="rota"><div class="l1">'+esc(d)+(j.rep?' · '+esc(r.motorista.split(' ')[0]):'')+' <span class="tag '+(r.cat==='Iporá'?'blue':r.cat==='Ambulância'?'':'navy')+'">'+esc(r.cat)+'</span>'+(r.andamento?' <span class="tag blue">Em rota</span>':'')+(r.valor!=null&&!r.andamento?'<span class="v">'+brl(r.valor)+'</span>':'')+'</div>'+
+      '<div class="l2">'+esc(r.destino||'—')+' · '+esc(r.placa||'')+' · '+nf(r.km,1)+' km'+(r.valor!=null&&r.valorFonte==='estimado'?' · <i>estimado</i>':'')+'</div>'+
+      '<div class="nums"><span><b>'+nf(r.saldo)+'</b> pacotes</span><span><b>'+nf(r.entregues)+'</b> entregues</span><span><b>'+nf(r.insucessos)+'</b> insuc.</span><span><b>'+nf(r.pontos)+'</b> paradas</span></div></div>'}).join(''):'<div class="empty">Nenhuma rota no período.</div>')+'</div>';
+  $('view').innerHTML=h;
+}
+
+/* ---------- PNR ---------- */
+R.pnr=function(){
+  if(S.dados.pnr)desenhaPnr(S.dados.pnr);else carregando('Carregando PNR…');
+  api('pnr').then(function(j){S.dados.pnr=j;if(S.tela==='pnr')desenhaPnr(j)}).catch(function(e){if(!S.dados.pnr)falha(e,R.pnr)});
+};
+var PTAG={Pendente:'warn','Em aviso de prazo':'blue','Para desconto':'bad',Resolvido:'ok'};
+function desenhaPnr(j){
+  var h='<div class="tiles"><div class="tile"><span>Em aberto</span><b>'+j.abertos+'</b><small>'+(j.valorAberto!=null?brl(j.valorAberto):'casos a resolver')+'</small></div><div class="tile"><span>Vencidos</span><b style="color:'+(j.vencidos?'var(--bad)':'inherit')+'">'+j.vencidos+'</b><small>prazo já passou</small></div></div>';
+  h+='<div class="card"><h2>Casos</h2>'+(j.casos.length?'<ul class="lista">'+j.casos.map(function(p){
+    return'<li><div class="x"><b>'+esc(p.produto||('Caso '+p.caso))+'</b><small>'+esc(p.data.slice(0,5))+(j.rep?' · '+esc(p.curto):'')+' · '+esc(p.cidade.replace(' de Goiás',''))+' · prazo '+esc(p.prazo.slice(0,5))+(p.valor!=null?' · '+brl(p.valor):'')+'</small></div><span class="tag '+(p.vencido?'bad':PTAG[p.status]||'')+'">'+(p.vencido?'Vencido':esc(p.status))+'</span></li>'}).join('')+'</ul>':'<div class="empty">Nenhum PNR. Continue assim!</div>')+'</div>'+
+    '<p class="rules">PNR é pacote que o comprador diz não ter recebido. Resolva antes do prazo para não virar desconto.</p>';
+  $('view').innerHTML=h;
+}
+
+/* ---------- instalar ---------- */
+var pedido=null,standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+var ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function barra(txt,btn){if(standalone||ls('jp_barra')===new Date().toISOString().slice(0,10))return;$('itxt').innerHTML=txt;$('ibtn').classList.toggle('hide',!btn);$('instalar').classList.remove('hide')}
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();pedido=e;barra('Instale o app <b>JP Motorista</b> para abrir direto pelo ícone.',true)});
+$('ibtn').onclick=function(){if(!pedido)return;pedido.prompt();pedido.userChoice.then(function(){pedido=null;$('instalar').classList.add('hide')})};
+$('ix').onclick=function(){$('instalar').classList.add('hide');ls('jp_barra',new Date().toISOString().slice(0,10))};
+window.addEventListener('appinstalled',function(){$('instalar').classList.add('hide')});
+if(ios&&!standalone)setTimeout(function(){barra('Para instalar: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>.',false)},3000);
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
+
+if(S.token&&S.user)iniciar();else telaLogin();
+})();
+</script>
+</body>
+</html>
