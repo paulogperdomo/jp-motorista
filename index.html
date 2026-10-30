@@ -137,6 +137,33 @@ nav button .dot{position:absolute;top:2px;left:calc(50% + 8px);min-width:17px;he
 #instalar p{margin:0;flex:1}
 #instalar button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;background:var(--blue);color:#fff}
 #instalar .x{background:none;color:rgba(255,255,255,.7);font-size:20px;padding:4px 8px;font-weight:400}
+
+/* PNR — detalhe (folha que sobe de baixo) */
+.lista li.tap{cursor:pointer}
+.lista li.tap:active{background:var(--bg)}
+.lista li .chev{width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2;flex:none}
+#folha{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;background:rgba(8,34,71,.45);opacity:0;transition:opacity .18s}
+#folha.on{opacity:1}
+#folha .fx{width:100%;max-width:560px;max-height:92vh;overflow:auto;background:var(--bg);border-radius:20px 20px 0 0;padding:8px 14px calc(18px + var(--bot));transform:translateY(30px);transition:transform .2s;-webkit-overflow-scrolling:touch}
+#folha.on .fx{transform:none}
+#folha .pega{width:42px;height:5px;border-radius:3px;background:#C9D3E0;margin:4px auto 10px}
+#folha .ft{display:flex;align-items:flex-start;gap:10px;margin:0 2px 12px}
+#folha .ft h3{flex:1;margin:0;font-size:17px;line-height:1.35}
+#folha .ft button{border:0;background:#fff;border-radius:10px;width:36px;height:36px;font-size:20px;color:var(--graphite);flex:none}
+.prazo{border-radius:14px;padding:14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;color:#fff;background:linear-gradient(135deg,var(--navy),var(--navy-2))}
+.prazo.bad{background:linear-gradient(135deg,#B91C1C,var(--bad))}.prazo.warn{background:linear-gradient(135deg,#92400E,var(--warn))}.prazo.ok{background:linear-gradient(135deg,#15803D,var(--ok))}
+.prazo b{font-size:26px;font-weight:800;line-height:1}.prazo span{font-size:12.5px;opacity:.9;font-weight:500;line-height:1.35}
+.dl{margin:0}.dl div{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13.5px;align-items:center}
+.dl div:first-child{border-top:0;padding-top:0}
+.dl dt{color:var(--muted);font-weight:600;font-size:12.5px;width:118px;flex:none}
+.dl dd{margin:0;flex:1;font-weight:600;min-width:0;word-break:break-word}
+.cp{border:0;background:var(--blue-soft);color:var(--blue);font-weight:700;font-size:12px;border-radius:8px;padding:6px 9px;flex:none}
+.passos{margin:0;padding:0;list-style:none;counter-reset:p}
+.passos li{position:relative;padding:0 0 12px 34px;font-size:13.5px;line-height:1.45;color:var(--navy)}
+.passos li:last-child{padding-bottom:0}
+.passos li:before{counter-increment:p;content:counter(p);position:absolute;left:0;top:-1px;width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center}
+.btn.wa{background:#16A34A}
+.toast{position:fixed;left:50%;bottom:calc(90px + var(--bot));transform:translateX(-50%);background:var(--navy);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;z-index:30}
 </style>
 </head>
 <body>
@@ -257,6 +284,7 @@ function navDraw(){
 $('nav').addEventListener('click',function(e){var b=e.target.closest('button');if(b)ir(b.dataset.t)});
 window.addEventListener('hashchange',function(){var t=location.hash.replace('#','');if(t&&t!==S.tela&&S.token)ir(t)});
 function ir(t){
+  if($("folha")&&$("folha").classList.contains("on"))fechaFolha();
   if(!telas().some(function(x){return x[0]===t}))t='inicio';
   S.tela=t;if(location.hash!=='#'+t)history.replaceState(null,'','#'+t);
   navDraw();window.scrollTo(0,0);R[t]();
@@ -396,13 +424,91 @@ R.pnr=function(){
   api('pnr').then(function(j){S.dados.pnr=j;if(S.tela==='pnr')desenhaPnr(j)}).catch(function(e){if(!S.dados.pnr)falha(e,R.pnr)});
 };
 var PTAG={Pendente:'warn','Em aviso de prazo':'blue','Para desconto':'bad',Resolvido:'ok'};
+var chev='<svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+S.pnrFiltro='abertos';
+function aberto(p){return p.status!=='Resolvido'}
 function desenhaPnr(j){
+  var f=S.pnrFiltro,casos=j.casos.filter(function(p){return f==='todos'||(f==='abertos'?aberto(p):!aberto(p))});
+  S.pnrLista=casos;
   var h='<div class="tiles"><div class="tile"><span>Em aberto</span><b>'+j.abertos+'</b><small>'+(j.valorAberto!=null?brl(j.valorAberto):'casos a resolver')+'</small></div><div class="tile"><span>Vencidos</span><b style="color:'+(j.vencidos?'var(--bad)':'inherit')+'">'+j.vencidos+'</b><small>prazo já passou</small></div></div>';
-  h+='<div class="card"><h2>Casos</h2>'+(j.casos.length?'<ul class="lista">'+j.casos.map(function(p){
-    return'<li><div class="x"><b>'+esc(p.produto||('Caso '+p.caso))+'</b><small>'+esc(p.data.slice(0,5))+(j.rep?' · '+esc(p.curto):'')+' · '+esc(p.cidade.replace(' de Goiás',''))+' · prazo '+esc(p.prazo.slice(0,5))+(p.valor!=null?' · '+brl(p.valor):'')+'</small></div><span class="tag '+(p.vencido?'bad':PTAG[p.status]||'')+'">'+(p.vencido?'Vencido':esc(p.status))+'</span></li>'}).join('')+'</ul>':'<div class="empty">Nenhum PNR. Continue assim!</div>')+'</div>'+
-    '<p class="rules">PNR é pacote que o comprador diz não ter recebido. Resolva antes do prazo para não virar desconto.</p>';
+  h+='<div class="seg" id="pseg">'+[['abertos','Em aberto'],['resolvidos','Resolvidos'],['todos','Todos']].map(function(x){return'<button data-f="'+x[0]+'" class="'+(f===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div>';
+  h+='<div class="card"><h2>Casos<span class="r">toque para ver tudo</span></h2>'+(casos.length?'<ul class="lista">'+casos.map(function(p,i){
+    return'<li class="tap" data-i="'+i+'"><div class="x"><b>'+esc(p.produto||('Caso '+p.caso))+'</b><small>'+esc(p.data.slice(0,5))+(j.rep?' · '+esc(p.curto):'')+' · '+esc(p.cidade.replace(' de Goiás',''))+' · prazo '+esc(p.prazo.slice(0,5))+(p.valor!=null?' · '+brl(p.valor):'')+'</small></div><span class="tag '+(p.vencido?'bad':PTAG[p.status]||'')+'">'+(p.vencido?'Vencido':esc(p.status))+'</span>'+chev+'</li>'}).join('')+'</ul>':'<div class="empty">'+(f==='abertos'?'Nenhum PNR em aberto. Continue assim!':'Nenhum caso aqui.')+'</div>')+'</div>'+
+    '<p class="rules">PNR é pacote que o comprador diz não ter recebido. Toque no caso para ver o pacote, o cliente e o que fazer. Resolva antes do prazo para não virar desconto.</p>';
   $('view').innerHTML=h;
+  $('pseg').onclick=function(e){var b=e.target.closest('button');if(b){S.pnrFiltro=b.dataset.f;desenhaPnr(j)}};
+  [].forEach.call(document.querySelectorAll('#view li.tap'),function(li){li.onclick=function(){abrePnr(S.pnrLista[+li.dataset.i],j.rep)}});
 }
+function diasAte(p){
+  if(p.dias!=null)return p.dias;
+  var m=String(p.prazo||'').match(/(\d{2})\/(\d{2})\/(\d{4})/);if(!m)return null;
+  var d=new Date(+m[3],m[2]-1,+m[1]),h=new Date(new Date().toDateString());return Math.round((d-h)/864e5);
+}
+function linha(rot,val,copia){
+  if(val==null||val==='')return'';
+  return'<div><dt>'+esc(rot)+'</dt><dd>'+val+'</dd>'+(copia?'<button class="cp" data-cp="'+esc(copia)+'">Copiar</button>':'')+'</div>';
+}
+function prazoBox(p){
+  var d=diasAte(p);
+  if(p.status==='Resolvido')return'<div class="prazo ok"><b>✓</b><span><strong>Caso resolvido.</strong><br>Não precisa fazer nada.</span></div>';
+  if(p.status==='Para desconto')return'<div class="prazo bad"><b>!</b><span><strong>Já entrou para desconto.</strong><br>Fale com o escritório se tiver como provar a entrega.</span></div>';
+  if(d==null)return'';
+  if(d<0)return'<div class="prazo bad"><b>'+(-d)+(d===-1?' dia':' dias')+'</b><span><strong>Prazo vencido</strong> em '+esc(p.prazo.slice(0,10))+'.<br>Resolva hoje e avise o escritório.</span></div>';
+  if(d===0)return'<div class="prazo bad"><b>Hoje</b><span><strong>Último dia</strong> para resolver ('+esc(p.prazo.slice(0,10))+').</span></div>';
+  return'<div class="prazo '+(d<=2?'warn':'')+'"><b>'+d+(d===1?' dia':' dias')+'</b><span>para resolver · prazo '+esc(p.prazo.slice(0,10))+(d<=2?'<br><strong>Está acabando o tempo.</strong>':'')+'</span></div>';
+}
+function passosPnr(p){
+  var fam=/famil|amig|vizinh|porteir|outr/i.test(p.recebedor||''),ps=[];
+  if(p.status==='Resolvido')return'';
+  ps.push('Confira no app de entregas do Mercado Livre a <b>foto e o local</b> da entrega '+(p.pacote?'do pacote <b>'+esc(p.pacote)+'</b>':'deste pacote')+'.');
+  if(fam)ps.push('Você marcou que quem recebeu foi <b>'+esc(p.recebedor)+'</b>. Volte ao endereço e procure essa pessoa: ela precisa confirmar que está com o pacote e avisar o comprador.');
+  else ps.push('Você marcou que quem recebeu foi o <b>próprio comprador</b>. Volte ao endereço e converse com ele ou com alguém da casa: muitas vezes outra pessoa guardou o pacote.');
+  ps.push('Descreva o produto para ajudar a pessoa a lembrar: <b>'+esc(p.produto||'—')+'</b>.');
+  ps.push('Se o pacote foi achado, peça ao comprador para <b>confirmar o recebimento no Mercado Livre</b>.');
+  ps.push('Mande para o escritório o que você descobriu (botão abaixo), com foto se tiver.');
+  return'<div class="card"><h2>Como resolver</h2><ol class="passos">'+ps.map(function(x){return'<li>'+x+'</li>'}).join('')+'</ol></div>';
+}
+function textoPnr(p){
+  return['PNR · caso '+p.caso,p.pacote?'Pacote: '+p.pacote:'','Produto: '+(p.produto||'—'),'Entrega: '+p.data+' · '+p.cidade+(p.recebedor?' · recebeu: '+p.recebedor:''),
+    p.rota&&p.rota.placa?'Rota '+p.idRota+' · '+p.rota.placa:p.idRota?'Rota '+p.idRota:'','Motorista: '+(p.motorista||''),'Prazo: '+p.prazo,'','O que descobri: '].filter(function(x,i,a){return x!==''||i===a.length-2}).join('\n');
+}
+function abrePnr(p,rep){
+  if(!p)return;
+  var r=p.rota,h='<div class="fx"><div class="pega"></div><div class="ft"><h3>'+esc(p.produto||('Caso '+p.caso))+'</h3><button id="fx" aria-label="Fechar">×</button></div>';
+  h+=prazoBox(p);
+  h+='<div class="card"><h2>Produto e pacote'+(p.valor!=null?'<span class="r">'+brl(p.valor)+'</span>':'')+'</h2><dl class="dl">'+
+    linha('Produto',esc(p.produto))+linha('Nº do pacote',esc(p.pacote),p.pacote)+(p.valor!=null?linha('Valor',brl(p.valor)):'')+linha('Nº do caso',esc(p.caso),p.caso)+'</dl></div>';
+  h+='<div class="card"><h2>Cliente e entrega</h2><dl class="dl">'+
+    linha('Cidade',esc(p.cidade))+linha('Quem recebeu',esc(p.recebedor||'Não informado'))+linha('Data da entrega',esc(p.data))+
+    (rep?linha('Motorista',esc(p.motorista)):'')+
+    (r?linha('Rota',esc(p.idRota)+(r.cluster?' · '+esc(r.cluster):''))+linha('Placa',esc(r.placa))+linha('Destino',esc(r.destino))+
+      linha('Horário da rota',r.saida?esc(r.saida.slice(-5))+(r.conclusao?' às '+esc(r.conclusao.slice(-5)):''):'')+
+      linha('Resultado da rota',nf(r.entregues)+' entregues · '+nf(r.insucessos)+' insucessos'):linha('Rota',esc(p.idRota)))+'</dl></div>';
+  h+=passosPnr(p);
+  h+='<div class="card"><h2>Andamento do caso</h2><dl class="dl">'+
+    linha('Status',esc(p.status))+linha('Situação no ML',esc(p.situacao))+linha('Decisão',esc(p.andamento))+linha('Última novidade',esc(p.ultima))+
+    linha('Aberto em',esc(p.criado))+linha('Prazo máximo',esc(p.prazo))+linha('Desconto na quinzena',esc(p.quinzenaDesc))+linha('Atualizado em',esc(p.atualizado))+'</dl></div>';
+  if(p.status!=='Resolvido')h+='<button class="btn wa" id="fwa">Avisar o escritório pelo WhatsApp</button>';
+  h+='<button class="btn sec" id="fcopia" style="margin-top:10px">Copiar dados do caso</button></div>';
+  var el=$('folha');if(!el){el=document.createElement('div');el.id='folha';document.body.appendChild(el)}
+  el.innerHTML=h;el.classList.remove('hide');document.body.style.overflow='hidden';
+  requestAnimationFrame(function(){el.classList.add('on')});
+  if(!(history.state&&history.state.folha))history.pushState({folha:1},'',location.href);
+  el.onclick=function(e){
+    if(e.target===el||e.target.id==='fx'){history.back();return}
+    var c=e.target.closest('[data-cp]');if(c)copiar(c.dataset.cp,'Copiado: '+c.dataset.cp);
+    if(e.target.id==='fcopia')copiar(textoPnr(p).replace(/\n\nO que descobri: $/,''),'Dados do caso copiados');
+    if(e.target.id==='fwa')window.open('https://wa.me/?text='+encodeURIComponent(textoPnr(p)),'_blank');
+  };
+}
+function fechaFolha(){var el=$('folha');if(!el)return;el.classList.remove('on');document.body.style.overflow='';setTimeout(function(){el.classList.add('hide')},180)}
+window.addEventListener('popstate',fechaFolha);
+function copiar(t,msg){
+  var ok=function(){toast(msg)};
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(ok,function(){velho()});else velho();
+  function velho(){var a=document.createElement('textarea');a.value=t;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();try{document.execCommand('copy');ok()}catch(e){}document.body.removeChild(a)}
+}
+function toast(t){var d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},1800)}
 
 /* ---------- GESTÃO (administrador) ---------- */
 R.gestao=function(){

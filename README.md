@@ -5,7 +5,7 @@ App do motorista da **JP Transportes** (PWA instalável), publicado pelo GitHub 
 - **Início**: rota do dia (andamento), previsão de amanhã, PNR em aberto, avisos.
 - **Abastecer**: registro do vale do convênio com km do painel, litros, valor e fotos do vale e do painel.
 - **Rotas**: rotas da quinzena atual, anterior ou do mês.
-- **PNR**: casos em aberto e prazos.
+- **PNR**: casos em aberto e prazos; tocar no caso abre o detalhe (pacote, produto, quem recebeu, rota, prazo, passo a passo para resolver, avisar o escritório pelo WhatsApp).
 
 A representante (Jessica) vê todos os motoristas e os valores; os demais veem só os próprios dados, sem valores.
 

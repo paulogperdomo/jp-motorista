@@ -1,7 +1,7 @@
 /* JP Motorista — service worker.
    Guarda só a "casca" do app (esta pasta) para abrir rápido e mesmo sem sinal.
    Os dados vêm sempre da API (Apps Script). Ao mudar algum arquivo daqui, subir VERSAO. */
-var VERSAO = 'jp-motorista-v2';
+var VERSAO = 'jp-motorista-v3';
 var ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './logo.webp', './icone-192.png', './icone-512.png', './favicon.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
