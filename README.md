@@ -9,6 +9,8 @@ App do motorista da **JP Transportes** (PWA instalável), publicado pelo GitHub 
 
 A representante (Jessica) vê todos os motoristas e os valores; os demais veem só os próprios dados, sem valores.
 
+**Administrador** (Paulo): entra escolhendo "Administrador" com PIN de 6 dígitos (aba Config, "PIN administrador (app)"). Vê tudo e tem a aba **Gestão**: publicar/apagar avisos, abastecimentos de todos com alertas e fotos, último acesso de cada motorista e gerar PIN novo (desconecta o motorista na hora).
+
 ## Como funciona
 - Este repositório tem só a interface (`index.html`), ícones, `manifest.webmanifest` e `sw.js`. Não tem PIN, senha nem dado de motorista.
 - Os dados vêm da planilha *Base de Dados - Sistema JP Transporte* por uma API no Google Apps Script
