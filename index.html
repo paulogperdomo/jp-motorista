@@ -93,6 +93,7 @@ main{max-width:560px;margin:0 auto;padding:14px 14px calc(96px + var(--bot))}
 .pv-tb{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
 .pv-tb th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;text-align:right;padding:0 0 4px}
 .pv-tb th:first-child{text-align:left}
+.pv-tb th:not(:first-child),.pv-tb td:not(:first-child){width:66px;padding-left:6px}
 .pv-tb td{padding:5px 0;border-top:1px solid var(--line);text-align:right;font-weight:600;color:var(--graphite)}
 .pv-tb td:first-child{text-align:left;color:var(--navy)}
 .pv-tb td.par{color:var(--navy);font-weight:800;font-size:14px}
@@ -372,10 +373,12 @@ function pvCard(d){
   if(p.ipora.length)h+='<div class="pv-sec"><h3><i style="background:var(--blue)"></i>Iporá (depende da escala)</h3><p class="ex">'+(p.iporaMedia?'Média de <b>'+nf(p.iporaMedia)+' paradas</b> por rota de Iporá. ':'')+'Quantas ficam com a JP depende da escala.</p>'+p.ipora.map(function(r){return pvRota(r,'ipora')}).join('')+'</div>';
   if(p.outras.length)h+='<div class="pv-sec"><h3><i style="background:#B9C6D8"></i>Paradas nossas em outras rotas</h3><p class="ex">A maior parte dos pacotes destas rotas é de outra região. Aqui aparecem só as paradas que caem nas nossas cidades.</p>'+p.outras.map(function(r){return pvRota(r,'outra')}).join('')+'</div>';
   if(p.resumo.length){
-    var tp=0,tk=0;
-    h+='<div class="pv-sec"><h3>Resumo por cidade</h3><p class="ex">Somando todas as rotas previstas (inclusive as de outras regiões).</p><table class="pv-tb"><tr><th>Cidade</th><th>Paradas</th><th>Pacotes</th><th>Rotas</th></tr>'+
-      p.resumo.map(function(c){tp+=c.paradas;tk+=c.pacotes;return'<tr><td><span class="dot '+c.grupo+'"></span>'+esc(c.cidade)+'</td><td class="par">'+nf(c.paradas)+'</td><td>'+nf(c.pacotes)+'</td><td>'+c.rotas+(c.emOutras?'<br><small style="color:var(--muted);font-weight:500">'+nf(c.emOutras)+' par. em outras</small>':'')+'</td></tr>'}).join('')+
-      '<tr class="tot"><td>Total nossas cidades</td><td class="par">'+nf(tp)+'</td><td>'+nf(tk)+'</td><td></td></tr></table></div>';
+    var linhaR=function(c){return'<tr><td><span class="dot '+c.grupo+'"></span>'+esc(c.cidade)+'</td><td class="par">'+nf(c.paradas)+'</td><td>'+nf(c.pacotes)+'</td><td>'+c.rotas+(c.emOutras?'<br><small style="color:var(--muted);font-weight:500">'+nf(c.emOutras)+' em outras</small>':'')+'</td></tr>'};
+    var fx=p.resumo.filter(function(c){return c.grupo==='fixa'}),ip=p.resumo.filter(function(c){return c.grupo!=='fixa'});
+    var sp=function(l,k){return l.reduce(function(a,c){return a+c[k]},0)};
+    h+='<div class="pv-sec"><h3>Resumo por cidade</h3><p class="ex">Somando todas as rotas previstas, inclusive as de outras regiões.</p><table class="pv-tb"><tr><th>Cidade</th><th>Paradas</th><th>Pacotes</th><th>Rotas</th></tr>'+
+      fx.map(linhaR).join('')+(fx.length?'<tr class="tot"><td>Total cidades fixas</td><td class="par">'+nf(sp(fx,'paradas'))+'</td><td>'+nf(sp(fx,'pacotes'))+'</td><td></td></tr>':'')+
+      ip.map(linhaR).join('')+'</table></div>';
   }
   h+='<div class="pv-nota"><b>Parada</b> = endereço de entrega (vários pacotes no mesmo endereço contam como 1 parada).'+(p.estimado?' Valores com ≈ são estimados pela quantidade de pacotes.':'')+' A previsão pode mudar até a rota ser liberada.</div>';
   return h+'</div>';
