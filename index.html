@@ -596,8 +596,13 @@ function toast(t){var d=document.createElement('div');d.className='toast';d.text
 /* ---------- GESTÃO (administrador) ---------- */
 R.gestao=function(){
   if(S.dados.gestao)desenhaGestao(S.dados.gestao);else carregando('Carregando gestão…');
-  api('gestao').then(function(j){S.dados.gestao=j;if(S.tela==='gestao')desenhaGestao(j)}).catch(function(e){if(!S.dados.gestao)falha(e,R.gestao)});
+  carregaGestao(S.gbusca||'');
 };
+function carregaGestao(q,rolar){
+  if(rolar&&$('gbuscar')){$('gbuscar').disabled=true;$('gbuscar').textContent='…'}
+  api('gestao',{busca:q}).then(function(j){S.dados.gestao=j;if(S.tela==='gestao'){desenhaGestao(j);if(rolar&&$('cabast'))$('cabast').scrollIntoView({behavior:'smooth'})}})
+    .catch(function(e){if(!S.dados.gestao)falha(e,R.gestao);else{gmsg(e.message);if($('gbuscar')){$('gbuscar').disabled=false;$('gbuscar').textContent='Buscar'}}});
+}
 function desenhaGestao(j){
   var ativos=j.motoristas.filter(function(m){return m.ativo});
   var h='<div id="gmsg"></div>';
@@ -609,11 +614,14 @@ function desenhaGestao(j){
     (j.avisos.length?'<ul class="lista" style="margin-top:14px">'+j.avisos.map(function(a){return'<li><div class="x"><b style="font-size:13.5px;font-weight:600;white-space:normal">'+esc(a.texto)+'</b><small>'+esc(a.data)+' · '+esc(a.para)+(a.ate?' · até '+esc(a.ate):'')+'</small></div><button class="link" data-apagar="'+a.linha+'" style="color:var(--bad)">Apagar</button></li>'}).join('')+'</ul>':'')+
   '</div>';
   var comAl=j.abastecimentos.filter(function(a){return a.alertas.length}).length;
-  h+='<div class="card"><h2>Abastecimentos recentes<span class="r">'+(comAl?'<span class="tag warn">'+comAl+' com alerta</span>':'<span class="tag ok">sem alerta</span>')+'</span></h2>'+(j.abastecimentos.length?'<ul class="lista">'+j.abastecimentos.map(function(a){
+  h+='<div class="card" id="cabast"><h2>'+(j.busca?'Abastecimentos encontrados':'Abastecimentos recentes')+'<span class="r">'+(comAl?'<span class="tag warn">'+comAl+' com alerta</span>':'<span class="tag ok">sem alerta</span>')+'</span></h2>'+
+    '<div style="display:flex;gap:8px;margin:-2px 0 6px;align-items:stretch"><input id="gbusca" style="flex:1;min-width:0" placeholder="Nº do vale, placa, nome ou 10/2026" value="'+esc(j.busca||'')+'"><button class="btn" id="gbuscar" style="width:auto;margin:0;padding:0 14px;font-size:14px">Buscar</button>'+(j.busca?'<button class="btn sec" id="glimpa" style="width:auto;margin:0;padding:0 12px;font-size:14px">Limpar</button>':'')+'</div>'+
+    (j.abastecimentos.length?'<ul class="lista">'+j.abastecimentos.map(function(a,i){
     return'<li style="align-items:flex-start"><div class="x"><b>'+esc(a.placa||'Sem placa')+' · '+nf(a.litros,2)+' L · '+brl(a.total)+'</b><small style="white-space:normal">'+esc(a.data)+' · vale '+esc(a.vale||'—')+' · '+esc(a.motorista||a.origem)+(a.km?' · '+nf(a.km)+' km':'')+(a.rodou?' (+'+nf(a.rodou)+')':'')+(a.cheio?' · cheio':'')+'</small>'+
       (a.alertas.length?'<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">'+a.alertas.map(function(x){return'<span class="tag warn">'+esc(x)+'</span>'}).join('')+'</div>':'')+
-      ((a.fotoVale||a.fotoPainel)?'<div style="margin-top:6px;display:flex;gap:14px">'+(a.fotoVale?'<a class="link" href="'+esc(a.fotoVale)+'" target="_blank" rel="noopener">Foto do vale</a>':'')+(a.fotoPainel?'<a class="link" href="'+esc(a.fotoPainel)+'" target="_blank" rel="noopener">Foto do painel</a>':'')+'</div>':'')+
-    '</div></li>'}).join('')+'</ul>':'<div class="empty">Nenhum abastecimento.</div>')+'</div>';
+      '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:14px">'+(a.fotoVale?'<a class="link" href="'+esc(a.fotoVale)+'" target="_blank" rel="noopener">Foto do vale</a>':'')+(a.fotoPainel?'<a class="link" href="'+esc(a.fotoPainel)+'" target="_blank" rel="noopener">Foto do painel</a>':'')+
+      '<button class="link" data-ed="'+i+'">Corrigir</button></div>'+
+    '</div></li>'}).join('')+'</ul>':'<div class="empty">'+(j.busca?'Nada encontrado para essa busca.':'Nenhum abastecimento.')+'</div>')+'</div>';
   h+='<div class="card"><h2>Motoristas e PIN</h2><ul class="lista">'+j.motoristas.map(function(m){
     return'<li><div class="x"><b>'+esc(m.curto)+(m.ativo?'':' <span class="tag">inativo</span>')+'</b><small>'+(m.entrou?'último acesso '+esc(m.entrou):'ainda não entrou no app')+(m.temPin?'':' · sem PIN')+'</small></div>'+(m.ativo?'<button class="link" data-pin="'+esc(m.id)+'">Novo PIN</button>':'')+'</li>'}).join('')+'</ul>'+
     '<p class="rules" style="margin:10px 0 0">Gerar um PIN novo desconecta o motorista na hora. Para tirar o acesso de vez, marque "Ativo = Não" na aba Motoristas.</p></div>';
@@ -627,6 +635,11 @@ function desenhaGestao(j){
     if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='Confirmar';return}
     b.textContent='…';api('apagarAviso',{linha:b.dataset.apagar}).then(function(){S.dados.inicio=null;gmsg('Aviso apagado.','ok');R.gestao()}).catch(function(e){gmsg(e.message)});
   }});
+  var busca=function(q){S.gbusca=q;carregaGestao(q,true)};
+  $('gbuscar').onclick=function(){busca($('gbusca').value.trim())};
+  $('gbusca').onkeydown=function(e){if(e.key==='Enter')busca(this.value.trim())};
+  if($('glimpa'))$('glimpa').onclick=function(){busca('')};
+  [].forEach.call(document.querySelectorAll('[data-ed]'),function(b){b.onclick=function(){editaAbast(j.abastecimentos[+b.dataset.ed],j)}});
   [].forEach.call(document.querySelectorAll('[data-pin]'),function(b){b.onclick=function(){
     if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='Confirmar novo PIN';return}
     b.textContent='Gerando…';api('novoPin',{id:b.dataset.pin}).then(function(r){
@@ -634,6 +647,59 @@ function desenhaGestao(j){
       b.dataset.ok='';b.textContent='Novo PIN';
     }).catch(function(e){gmsg(e.message);b.dataset.ok='';b.textContent='Novo PIN'});
   }});
+}
+/* correção de abastecimento (administrador) */
+function editaAbast(a,j){
+  var mot=j.motoristas.map(function(m){return m.nome});if(a.motoristaNome&&mot.indexOf(a.motoristaNome)<0)mot.unshift(a.motoristaNome);
+  var pl=(j.placas||[]).slice();if(a.placa&&pl.indexOf(a.placa)<0)pl.unshift(a.placa);
+  var v=function(x,d){return x?String(nf(x,d==null?2:d)).replace(/\./g,''):''};
+  var h='<div class="fx" id="fx"><div class="pega"></div><div class="ft"><h3>Corrigir abastecimento<br><small style="font-weight:500;color:var(--muted);font-size:13px">'+esc(a.data)+' · vale '+esc(a.vale||'—')+'</small></h3><button type="button" id="ffecha" aria-label="Fechar">×</button></div>'+
+    '<div id="emsg"></div><div class="card">'+
+    '<div class="row"><div><label class="first" for="e_vale">Nº do vale</label><input id="e_vale" inputmode="numeric" value="'+esc(a.vale)+'"></div>'+
+      '<div><label class="first" for="e_placa">Placa</label><select id="e_placa"><option value="">Sem placa</option>'+pl.map(function(p){return'<option'+(p===a.placa?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div></div>'+
+    '<label for="e_mot">Motorista</label><select id="e_mot"><option value="">—</option>'+mot.map(function(m){return'<option'+(m===a.motoristaNome?' selected':'')+'>'+esc(m)+'</option>'}).join('')+'</select>'+
+    '<label for="e_quando">Data e hora</label><input id="e_quando" type="datetime-local" value="'+esc(a.dataIso)+'">'+
+    '<label for="e_km">Km do painel</label><input id="e_km" inputmode="numeric" value="'+(a.km||'')+'">'+
+    '<div class="row"><div><label for="e_litros">Litros</label><input id="e_litros" inputmode="decimal" value="'+v(a.litros)+'"></div><div><label for="e_valor">Valor combustível (R$)</label><input id="e_valor" inputmode="decimal" value="'+v(a.valor)+'"></div></div>'+
+    '<div class="calc" id="e_calc"></div>'+
+    '<div class="row"><div><label for="e_outros">Item extra</label><input id="e_outros" value="'+esc(a.outros)+'" placeholder="Ex.: fluido de freio"></div><div><label for="e_vout">Valor extra (R$)</label><input id="e_vout" inputmode="decimal" value="'+v(a.valorOutros)+'"></div></div>'+
+    '<label>Tanque cheio?</label><div class="toggle" id="e_cheio"><button type="button" data-v="1" class="'+(a.cheio?'on':'')+'">Sim</button><button type="button" data-v="0" class="'+(a.cheio?'':'on')+'">Não</button></div>'+
+    '<label for="e_obs">Observação</label><textarea id="e_obs" rows="2">'+esc(a.obs)+'</textarea>'+
+    '<div class="hint">O que você mudar fica anotado na Observação, com data e hora.</div></div>'+
+    '<button class="btn" id="e_salva">Salvar correção</button>'+
+    '<button class="btn sec" id="e_exclui" style="margin-top:10px;color:var(--bad)">Excluir este lançamento</button>'+
+    '<p class="rules" style="margin:10px 2px 0">Excluir é para lançamento duplicado ou que não existiu. As fotos continuam guardadas no Drive.</p></div>';
+  var el=$('folha');if(!el){el=document.createElement('div');el.id='folha';document.body.appendChild(el)}
+  el.innerHTML=h;el.classList.remove('hide');document.body.style.overflow='hidden';
+  requestAnimationFrame(function(){el.classList.add('on')});
+  if(!(history.state&&history.state.folha))history.pushState({folha:1},'',location.href);
+  var cheio=a.cheio;
+  var calc=function(){var l=num($('e_litros').value),vv=num($('e_valor').value),o=num($('e_vout').value);$('e_calc').innerHTML='<span>R$/L '+(l&&vv?brl(vv/l):'—')+'</span><b>Total '+brl(vv+o)+'</b>'};
+  ['e_litros','e_valor','e_vout'].forEach(function(i){$(i).oninput=calc});calc();
+  var emsg=function(t,c){$('emsg').innerHTML='<div class="msg '+(c||'bad')+'">'+esc(t)+'</div>';$('fx').scrollTop=0};
+  var ref={linha:a.linha,id:a.id,vale0:a.vale};
+  var pronto=function(t){history.back();toast(t);S.dados.inicio=null;carregaGestao(S.gbusca||'')};
+  el.onclick=function(e){
+    if(e.target===el||e.target.id==='ffecha'){history.back();return}
+    var tb=e.target.closest('#e_cheio button');if(tb){cheio=tb.dataset.v==='1';[].forEach.call($('e_cheio').children,function(x){x.classList.toggle('on',x===tb)})}
+  };
+  $('e_salva').onclick=function(){
+    var b=this,d={vale:$('e_vale').value.trim(),placa:$('e_placa').value,motorista:$('e_mot').value,quando:$('e_quando').value,
+      km:num($('e_km').value.replace(/\D/g,'')),litros:num($('e_litros').value),valor:num($('e_valor').value),
+      outros:$('e_outros').value.trim(),valorOutros:num($('e_vout').value),cheio:cheio,obs:$('e_obs').value.trim()};
+    if(!d.vale)return emsg('Informe o nº do vale.');
+    b.disabled=true;b.textContent='Salvando…';
+    api('editarAbast',Object.assign({dados:d},ref)).then(function(r){
+      if(r.nada){b.disabled=false;b.textContent='Salvar correção';return emsg('Nada foi alterado.','warn')}
+      if(r.avisos&&r.avisos.length){$('emsg').innerHTML='<div class="msg warn">Salvo. Atenção: '+r.avisos.map(esc).join(' ')+'</div>';b.textContent='Fechar';b.disabled=false;b.onclick=function(){pronto('Correção salva')};S.dados.inicio=null;return}
+      pronto('Correção salva');
+    }).catch(function(e){b.disabled=false;b.textContent='Salvar correção';emsg(e.message)});
+  };
+  $('e_exclui').onclick=function(){
+    var b=this;if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='Toque de novo para confirmar a exclusão';return}
+    b.disabled=true;b.textContent='Excluindo…';
+    api('excluirAbast',ref).then(function(){pronto('Lançamento excluído')}).catch(function(e){b.disabled=false;b.dataset.ok='';b.textContent='Excluir este lançamento';emsg(e.message)});
+  };
 }
 function gmsg(t,cls){$('gmsg').innerHTML='<div class="msg '+(cls||'bad')+'">'+esc(t)+'</div>';window.scrollTo({top:0,behavior:'smooth'})}
 
