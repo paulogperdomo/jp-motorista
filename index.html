@@ -193,6 +193,12 @@ nav button .dot{position:absolute;top:2px;left:calc(50% + 8px);min-width:17px;he
 .passos li:last-child{padding-bottom:0}
 .passos li:before{counter-increment:p;content:counter(p);position:absolute;left:0;top:-1px;width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center}
 .btn.wa{background:#16A34A}
+.acoes{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.acoes a{flex:1;min-width:92px;text-align:center;text-decoration:none;font-weight:700;font-size:13px;border-radius:10px;padding:11px 8px;background:var(--blue-soft);color:var(--blue)}
+.acoes a.wa{background:#DCFCE7;color:#15803D}
+.carreg{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;padding:4px 0}
+.carreg .gira{width:18px;height:18px;border-width:2px}
+.nota{font-size:12px;color:var(--muted);margin:10px 0 0;line-height:1.4}
 .toast{position:fixed;left:50%;bottom:calc(90px + var(--bot));transform:translateX(-50%);background:var(--navy);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;z-index:30}
 </style>
 </head>
@@ -517,7 +523,7 @@ function desenhaPnr(j){
   h+='<div class="seg" id="pseg">'+[['abertos','Em aberto'],['resolvidos','Resolvidos'],['todos','Todos']].map(function(x){return'<button data-f="'+x[0]+'" class="'+(f===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div>';
   h+='<div class="card"><h2>Casos<span class="r">toque para ver tudo</span></h2>'+(casos.length?'<ul class="lista">'+casos.map(function(p,i){
     return'<li class="tap" data-i="'+i+'"><div class="x"><b>'+esc(p.produto||('Caso '+p.caso))+'</b><small>'+esc(p.data.slice(0,5))+(j.rep?' · '+esc(p.curto):'')+' · '+esc(p.cidade.replace(' de Goiás',''))+' · prazo '+esc(p.prazo.slice(0,5))+(p.valor!=null?' · '+brl(p.valor):'')+'</small></div><span class="tag '+(p.vencido?'bad':PTAG[p.status]||'')+'">'+(p.vencido?'Vencido':esc(p.status))+'</span>'+chev+'</li>'}).join('')+'</ul>':'<div class="empty">'+(f==='abertos'?'Nenhum PNR em aberto. Continue assim!':'Nenhum caso aqui.')+'</div>')+'</div>'+
-    '<p class="rules">PNR é pacote que o comprador diz não ter recebido. Toque no caso para ver o pacote, o cliente e o que fazer. Resolva antes do prazo para não virar desconto.</p>';
+    '<p class="rules">PNR é pacote que o comprador diz não ter recebido. Toque no caso para ver o pacote, o nome, telefone e endereço do cliente e o que fazer. Resolva antes do prazo para não virar desconto.</p>';
   $('view').innerHTML=h;
   $('pseg').onclick=function(e){var b=e.target.closest('button');if(b){S.pnrFiltro=b.dataset.f;desenhaPnr(j)}};
   [].forEach.call(document.querySelectorAll('#view li.tap'),function(li){li.onclick=function(){abrePnr(S.pnrLista[+li.dataset.i],j.rep)}});
@@ -551,32 +557,79 @@ function passosPnr(p){
   ps.push('Mande para o escritório o que você descobriu (botão abaixo), com foto se tiver.');
   return'<div class="card"><h2>Como resolver</h2><ol class="passos">'+ps.map(function(x){return'<li>'+x+'</li>'}).join('')+'</ol></div>';
 }
+function endCompleto(d){
+  if(!d)return'';
+  var cid=[d.cidade,d.uf].filter(Boolean).join('/');
+  return[d.endereco,d.complemento,d.bairro,cid].filter(Boolean).join(', ');
+}
+function foneBR(t){var d=String(t||'').replace(/\D/g,'');if(d.length===10||d.length===11)d='55'+d;return d.length>=12?d:''}
 function textoPnr(p){
-  return['PNR · caso '+p.caso,p.pacote?'Pacote: '+p.pacote:'','Produto: '+(p.produto||'—'),'Entrega: '+p.data+' · '+p.cidade+(p.recebedor?' · recebeu: '+p.recebedor:''),
+  var d=p.det||{};
+  return['PNR · caso '+p.caso,p.pacote?'Pacote: '+p.pacote:'','Produto: '+(p.produto||'—'),
+    d.comprador?'Cliente: '+d.comprador+(d.telefone?' · '+d.telefone:''):'',
+    endCompleto(d)?'Endereço: '+endCompleto(d):'',d.maps?'Mapa: '+d.maps:'',
+    'Entrega: '+p.data+' · '+p.cidade+(p.recebedor?' · recebeu: '+(d.recebedorNome?d.recebedorNome+' ('+p.recebedor+')':p.recebedor):''),
     p.rota&&p.rota.placa?'Rota '+p.idRota+' · '+p.rota.placa:p.idRota?'Rota '+p.idRota:'','Motorista: '+(p.motorista||''),'Prazo: '+p.prazo,'','O que descobri: '].filter(function(x,i,a){return x!==''||i===a.length-2}).join('\n');
+}
+function blocoCliente(p){
+  var d=p.det;
+  if(d===undefined)return'<div class="card"><h2>Cliente e endereço</h2><div class="carreg"><div class="gira"></div>Buscando nome, telefone e endereço…</div></div>';
+  if(d===null)return'<div class="card"><h2>Cliente e endereço</h2><p class="nota">Não consegui buscar agora. Feche e abra o caso de novo.</p></div>';
+  var tel=foneBR(d.telefone),end=endCompleto(d);
+  if(!d.comprador&&!end)return'<div class="card"><h2>Cliente e endereço</h2><p class="nota">Este caso ainda não chegou na base com os dados do cliente. Normalmente aparece depois da próxima atualização do robô.</p></div>';
+  var h='<div class="card"><h2>Cliente e endereço</h2><dl class="dl">'+
+    linha('Cliente',esc(d.comprador))+linha('Telefone',esc(d.telefone),d.telefone)+
+    linha('Endereço',esc(d.endereco),d.endereco)+linha('Complemento / referência',esc(d.complemento))+linha('Bairro',esc(d.bairro))+
+    linha('Cidade',esc([d.cidade,d.uf].filter(Boolean).join('/')))+linha('Parada na rota',esc(d.parada))+'</dl>';
+  var bt=[];
+  if(tel)bt.push('<a href="tel:+'+tel+'">Ligar</a>','<a class="wa" href="https://wa.me/'+tel+'" target="_blank" rel="noopener">WhatsApp</a>');
+  if(d.maps)bt.push('<a href="'+esc(d.maps)+'" target="_blank" rel="noopener">Abrir no mapa</a>');
+  if(bt.length)h+='<div class="acoes">'+bt.join('')+'</div>';
+  if(d.fonte==='conferencia')h+='<p class="nota">Dados tirados da conferência do pacote (o caso ainda não chegou completo na base).</p>';
+  return h+'</div>';
+}
+function blocoRecebimento(p,rep){
+  var d=p.det||{};
+  var h=linha('Quem recebeu',esc(d.recebedorNome?d.recebedorNome+(p.recebedor?' ('+p.recebedor+')':''):(p.recebedor||'Não informado')))+
+    linha('Documento informado',esc(d.documento))+linha('Recebido em',esc(d.recebidoEm))+
+    (d.situacaoEntrega?linha('Situação do pacote',esc(d.situacaoEntrega)):'');
+  return'<div class="card"><h2>Recebimento</h2><dl class="dl">'+h+'</dl></div>';
 }
 function abrePnr(p,rep){
   if(!p)return;
-  var r=p.rota,h='<div class="fx"><div class="pega"></div><div class="ft"><h3>'+esc(p.produto||('Caso '+p.caso))+'</h3><button id="fx" aria-label="Fechar">×</button></div>';
+  S.pnrAberto=p;
+  desenhaFolha(p,rep);
+  if(!(history.state&&history.state.folha))history.pushState({folha:1},'',location.href);
+  if(p.det===undefined){
+    api('pnrDetalhe',{caso:p.caso}).then(function(j){p.det=j.det;if(S.pnrAberto===p)desenhaFolha(p,rep)})
+      .catch(function(){p.det=null;if(S.pnrAberto===p)desenhaFolha(p,rep);delete p.det});
+  }
+}
+function desenhaFolha(p,rep){
+  var r=p.rota,d=p.det||{},h='<div class="fx"><div class="pega"></div><div class="ft"><h3>'+esc(p.produto||('Caso '+p.caso))+'</h3><button id="fx" aria-label="Fechar">×</button></div>';
   h+=prazoBox(p);
   h+='<div class="card"><h2>Produto e pacote'+(p.valor!=null?'<span class="r">'+brl(p.valor)+'</span>':'')+'</h2><dl class="dl">'+
     linha('Produto',esc(p.produto))+linha('Nº do pacote',esc(p.pacote),p.pacote)+(p.valor!=null?linha('Valor',brl(p.valor)):'')+linha('Nº do caso',esc(p.caso),p.caso)+'</dl></div>';
-  h+='<div class="card"><h2>Cliente e entrega</h2><dl class="dl">'+
-    linha('Cidade',esc(p.cidade))+linha('Quem recebeu',esc(p.recebedor||'Não informado'))+linha('Data da entrega',esc(p.data))+
-    (rep?linha('Motorista',esc(p.motorista)):'')+
-    (r?linha('Rota',esc(p.idRota)+(r.cluster?' · '+esc(r.cluster):''))+linha('Placa',esc(r.placa))+linha('Destino',esc(r.destino))+
+  h+=blocoCliente(p);
+  h+=blocoRecebimento(p,rep);
+  h+='<div class="card"><h2>Rota da entrega</h2><dl class="dl">'+
+    linha('Data da entrega',esc(p.data))+linha('Cidade',esc(p.cidade))+
+    (rep?linha('Motorista',esc(p.motorista))+linha('Telefone do motorista',esc(d.telMotorista)):'')+
+    (r?linha('Rota',esc(p.idRota)+(r.cluster||d.cluster?' · '+esc(r.cluster||d.cluster):''))+linha('Placa',esc(r.placa))+linha('Destino',esc(r.destino))+
       linha('Horário da rota',r.saida?esc(r.saida.slice(-5))+(r.conclusao?' às '+esc(r.conclusao.slice(-5)):''):'')+
-      linha('Resultado da rota',nf(r.entregues)+' entregues · '+nf(r.insucessos)+' insucessos'):linha('Rota',esc(p.idRota)))+'</dl></div>';
+      linha('Resultado da rota',nf(r.entregues)+' entregues · '+nf(r.insucessos)+' insucessos'):linha('Rota',esc(p.idRota)+(d.cluster?' · '+esc(d.cluster):'')))+'</dl></div>';
   h+=passosPnr(p);
   h+='<div class="card"><h2>Andamento do caso</h2><dl class="dl">'+
-    linha('Status',esc(p.status))+linha('Situação no ML',esc(p.situacao))+linha('Decisão',esc(p.andamento))+linha('Última novidade',esc(p.ultima))+
-    linha('Aberto em',esc(p.criado))+linha('Prazo máximo',esc(p.prazo))+linha('Desconto na quinzena',esc(p.quinzenaDesc))+linha('Atualizado em',esc(p.atualizado))+'</dl></div>';
+    linha('Status',esc(p.status))+linha('Situação no ML',esc(p.situacao))+linha('Decisão',esc(p.andamento))+linha('Última novidade',esc(d.ultAlteracao||p.ultima))+
+    linha('Último evento em',esc(d.ultEvento))+linha('Aberto em',esc(d.criado||p.criado))+linha('Prazo máximo',esc(p.prazo))+
+    linha('Escritório falou com o motorista',esc(d.contatoMotorista))+linha('Comprovante anexado por',esc(d.comprovante))+linha('Revisão pedida por',esc(d.revisao))+
+    linha('Observação',esc(d.observacao))+linha('Desconto na quinzena',esc(p.quinzenaDesc))+linha('Atualizado em',esc(p.atualizado))+'</dl></div>';
   if(p.status!=='Resolvido')h+='<button class="btn wa" id="fwa">Avisar o escritório pelo WhatsApp</button>';
   h+='<button class="btn sec" id="fcopia" style="margin-top:10px">Copiar dados do caso</button></div>';
   var el=$('folha');if(!el){el=document.createElement('div');el.id='folha';document.body.appendChild(el)}
+  var aberta=el.classList.contains('on'),sc=aberta&&el.firstChild?el.firstChild.scrollTop:0;
   el.innerHTML=h;el.classList.remove('hide');document.body.style.overflow='hidden';
-  requestAnimationFrame(function(){el.classList.add('on')});
-  if(!(history.state&&history.state.folha))history.pushState({folha:1},'',location.href);
+  if(aberta)el.firstChild.scrollTop=sc;else requestAnimationFrame(function(){el.classList.add('on')});
   el.onclick=function(e){
     if(e.target===el||e.target.id==='fx'){history.back();return}
     var c=e.target.closest('[data-cp]');if(c)copiar(c.dataset.cp,'Copiado: '+c.dataset.cp);
@@ -584,7 +637,7 @@ function abrePnr(p,rep){
     if(e.target.id==='fwa')window.open('https://wa.me/?text='+encodeURIComponent(textoPnr(p)),'_blank');
   };
 }
-function fechaFolha(){var el=$('folha');if(!el)return;el.classList.remove('on');document.body.style.overflow='';setTimeout(function(){el.classList.add('hide')},180)}
+function fechaFolha(){S.pnrAberto=null;var el=$('folha');if(!el)return;el.classList.remove('on');document.body.style.overflow='';setTimeout(function(){el.classList.add('hide')},180)}
 window.addEventListener('popstate',fechaFolha);
 function copiar(t,msg){
   var ok=function(){toast(msg)};
